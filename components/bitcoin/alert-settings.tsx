@@ -6,10 +6,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Bell, BellOff, BellRing } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Bell, BellOff, BellRing, Mail, MessageCircle, Send } from "lucide-react"
 
 interface AlertSettingsProps {
   currentPrice: number | undefined
+}
+
+type NotificationChannel = "browser" | "email" | "telegram" | "whatsapp"
+
+interface NotificationConfig {
+  browser: boolean
+  email: boolean
+  telegram: boolean
+  whatsapp: boolean
+  emailAddress: string
+  telegramChatId: string
+  phoneNumber: string
 }
 
 export function AlertSettings({ currentPrice }: AlertSettingsProps) {
@@ -18,6 +31,17 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
   const [basePrice, setBasePrice] = useState<number | null>(null)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
   const hasTriggeredRef = useRef(false)
+  const lastCheckedPriceRef = useRef<number | null>(null)
+  
+  const [notificationConfig, setNotificationConfig] = useState<NotificationConfig>({
+    browser: true,
+    email: false,
+    telegram: false,
+    whatsapp: false,
+    emailAddress: "",
+    telegramChatId: "",
+    phoneNumber: "",
+  })
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -34,53 +58,116 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
     return false
   }
 
-  const sendNotification = useCallback((title: string, body: string) => {
+  const sendBrowserNotification = useCallback((title: string, body: string) => {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      new Notification(title, {
-        body,
-        icon: "/bitcoin-icon.png",
-      })
+      try {
+        const notification = new Notification(title, {
+          body,
+          icon: "/bitcoin-icon.png",
+          tag: "bitcoin-alert",
+          requireInteraction: true,
+        })
+        notification.onclick = () => {
+          window.focus()
+          notification.close()
+        }
+      } catch (error) {
+        console.error("Error sending notification:", error)
+      }
     }
   }, [])
+
+  const sendEmailNotification = useCallback(async (subject: string, body: string) => {
+    if (!notificationConfig.emailAddress) return
+    
+    const mailtoLink = `mailto:${notificationConfig.emailAddress}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    window.open(mailtoLink, "_blank")
+  }, [notificationConfig.emailAddress])
+
+  const sendTelegramNotification = useCallback(async (message: string) => {
+    if (!notificationConfig.telegramChatId) return
+    
+    const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(message)}&text=${encodeURIComponent("Bitcoin Price Alert")}`
+    window.open(telegramUrl, "_blank")
+  }, [notificationConfig.telegramChatId])
+
+  const sendWhatsAppNotification = useCallback((message: string) => {
+    const phone = notificationConfig.phoneNumber.replace(/\D/g, "")
+    const whatsappUrl = phone 
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(whatsappUrl, "_blank")
+  }, [notificationConfig.phoneNumber])
+
+  const sendAllNotifications = useCallback((title: string, body: string) => {
+    if (notificationConfig.browser) {
+      sendBrowserNotification(title, body)
+    }
+    if (notificationConfig.email) {
+      sendEmailNotification(title, body)
+    }
+    if (notificationConfig.telegram) {
+      sendTelegramNotification(`${title}\n\n${body}`)
+    }
+    if (notificationConfig.whatsapp) {
+      sendWhatsAppNotification(`${title}\n\n${body}`)
+    }
+  }, [notificationConfig, sendBrowserNotification, sendEmailNotification, sendTelegramNotification, sendWhatsAppNotification])
 
   const activateAlert = async () => {
     if (!currentPrice) return
 
-    if (notificationPermission !== "granted") {
+    if (notificationConfig.browser && notificationPermission !== "granted") {
       const granted = await requestNotificationPermission()
-      if (!granted) {
-        alert("Please enable notifications to use price alerts")
-        return
+      if (!granted && notificationConfig.browser) {
+        const otherChannels = notificationConfig.email || notificationConfig.telegram || notificationConfig.whatsapp
+        if (!otherChannels) {
+          alert("Please enable browser notifications or select another notification channel")
+          return
+        }
       }
+    }
+
+    const hasAnyChannel = notificationConfig.browser || notificationConfig.email || notificationConfig.telegram || notificationConfig.whatsapp
+    if (!hasAnyChannel) {
+      alert("Please select at least one notification channel")
+      return
     }
 
     setBasePrice(currentPrice)
     setIsAlertActive(true)
     hasTriggeredRef.current = false
+    lastCheckedPriceRef.current = currentPrice
   }
 
   const deactivateAlert = () => {
     setIsAlertActive(false)
     setBasePrice(null)
     hasTriggeredRef.current = false
+    lastCheckedPriceRef.current = null
   }
 
   useEffect(() => {
     if (!isAlertActive || !basePrice || !currentPrice || hasTriggeredRef.current) return
+    if (lastCheckedPriceRef.current === currentPrice) return
 
+    lastCheckedPriceRef.current = currentPrice
     const percentChange = ((currentPrice - basePrice) / basePrice) * 100
     const threshold = parseFloat(alertPercent)
 
     if (Math.abs(percentChange) >= threshold) {
       hasTriggeredRef.current = true
       const direction = percentChange > 0 ? "increased" : "decreased"
-      sendNotification(
-        "Bitcoin Price Alert",
-        `BTC has ${direction} by ${Math.abs(percentChange).toFixed(2)}% to $${currentPrice.toLocaleString()}`
-      )
+      const message = `BTC has ${direction} by ${Math.abs(percentChange).toFixed(2)}% to $${currentPrice.toLocaleString()}`
+      
+      sendAllNotifications("Bitcoin Price Alert", message)
       deactivateAlert()
     }
-  }, [currentPrice, isAlertActive, basePrice, alertPercent, sendNotification])
+  }, [currentPrice, isAlertActive, basePrice, alertPercent, sendAllNotifications])
+
+  const updateConfig = (channel: NotificationChannel, value: boolean) => {
+    setNotificationConfig(prev => ({ ...prev, [channel]: value }))
+  }
 
   const targetPriceUp = basePrice ? basePrice * (1 + parseFloat(alertPercent) / 100) : null
   const targetPriceDown = basePrice ? basePrice * (1 - parseFloat(alertPercent) / 100) : null
@@ -123,6 +210,98 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
           </div>
         </div>
 
+        <div className="space-y-3 pt-2 border-t border-border/50">
+          <Label className="text-sm text-muted-foreground">Notification Channels</Label>
+          
+          <div className="flex items-center gap-2">
+            <Checkbox 
+              id="browser-notif" 
+              checked={notificationConfig.browser}
+              onCheckedChange={(checked) => updateConfig("browser", !!checked)}
+              disabled={isAlertActive}
+            />
+            <Label htmlFor="browser-notif" className="flex items-center gap-2 text-sm cursor-pointer">
+              <Bell className="h-4 w-4" />
+              Browser Notification
+            </Label>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="email-notif" 
+                checked={notificationConfig.email}
+                onCheckedChange={(checked) => updateConfig("email", !!checked)}
+                disabled={isAlertActive}
+              />
+              <Label htmlFor="email-notif" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Mail className="h-4 w-4" />
+                Email
+              </Label>
+            </div>
+            {notificationConfig.email && (
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={notificationConfig.emailAddress}
+                onChange={(e) => setNotificationConfig(prev => ({ ...prev, emailAddress: e.target.value }))}
+                disabled={isAlertActive}
+                className="ml-6 w-[calc(100%-1.5rem)]"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="telegram-notif" 
+                checked={notificationConfig.telegram}
+                onCheckedChange={(checked) => updateConfig("telegram", !!checked)}
+                disabled={isAlertActive}
+              />
+              <Label htmlFor="telegram-notif" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Send className="h-4 w-4" />
+                Telegram
+              </Label>
+            </div>
+            {notificationConfig.telegram && (
+              <Input
+                type="text"
+                placeholder="Your Telegram username"
+                value={notificationConfig.telegramChatId}
+                onChange={(e) => setNotificationConfig(prev => ({ ...prev, telegramChatId: e.target.value }))}
+                disabled={isAlertActive}
+                className="ml-6 w-[calc(100%-1.5rem)]"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="whatsapp-notif" 
+                checked={notificationConfig.whatsapp}
+                onCheckedChange={(checked) => updateConfig("whatsapp", !!checked)}
+                disabled={isAlertActive}
+              />
+              <Label htmlFor="whatsapp-notif" className="flex items-center gap-2 text-sm cursor-pointer">
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </Label>
+            </div>
+            {notificationConfig.whatsapp && (
+              <Input
+                type="tel"
+                placeholder="+1234567890 (optional)"
+                value={notificationConfig.phoneNumber}
+                onChange={(e) => setNotificationConfig(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                disabled={isAlertActive}
+                className="ml-6 w-[calc(100%-1.5rem)]"
+              />
+            )}
+          </div>
+        </div>
+
         <div className="flex gap-2">
           {!isAlertActive ? (
             <Button onClick={activateAlert} disabled={!currentPrice} className="flex-1">
@@ -160,9 +339,9 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
           </div>
         )}
 
-        {notificationPermission === "denied" && (
+        {notificationConfig.browser && notificationPermission === "denied" && (
           <p className="text-xs text-red-500">
-            Notifications are blocked. Please enable them in your browser settings.
+            Browser notifications are blocked. Please enable them in your browser settings.
           </p>
         )}
       </CardContent>
