@@ -44,6 +44,7 @@ export async function GET() {
       previousClose: previousClose,
       high: meta.regularMarketDayHigh,
       low: meta.regularMarketDayLow,
+      volume: meta.regularMarketVolume,
       priceHistory: priceHistory,
       lastUpdated: new Date().toISOString(),
     })
