@@ -71,10 +71,7 @@ export function LivePriceTicker({ price }: LivePriceTickerProps) {
   // Handle real price updates
   useEffect(() => {
     if (price === undefined) return
-
-    const prevPrice = lastRealPrice.current
     lastRealPrice.current = price
-
     setDisplayPrice(price)
   }, [price])
 
@@ -83,9 +80,6 @@ export function LivePriceTicker({ price }: LivePriceTickerProps) {
   }
 
   const priceDigits = formatPrice(displayPrice)
-  const trend = previousPrice !== undefined && price !== undefined
-    ? price > previousPrice ? "up" : price < previousPrice ? "down" : null
-    : null
 
   return (
     <div className="relative">
@@ -107,6 +101,7 @@ export function LivePriceTicker({ price }: LivePriceTickerProps) {
             isDecimal={digit === "."}
           />
         ))}
+      </div>
     </div>
   )
 }
