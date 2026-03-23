@@ -59,21 +59,32 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
   }
 
   const sendBrowserNotification = useCallback((title: string, body: string) => {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      console.log("[v0] Browser notifications not supported")
+      return
+    }
+    
+    console.log("[v0] Attempting browser notification - Permission:", Notification.permission)
+    
+    if (Notification.permission === "granted") {
       try {
         const notification = new Notification(title, {
           body,
           icon: "/bitcoin-icon.png",
-          tag: "bitcoin-alert",
+          tag: "bitcoin-alert-" + Date.now(),
           requireInteraction: true,
+          silent: false,
         })
+        console.log("[v0] Browser notification sent successfully")
         notification.onclick = () => {
           window.focus()
           notification.close()
         }
       } catch (error) {
-        console.error("Error sending notification:", error)
+        console.error("[v0] Error sending notification:", error)
       }
+    } else {
+      console.log("[v0] Browser notifications not granted")
     }
   }, [])
 
@@ -147,22 +158,36 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
     lastCheckedPriceRef.current = null
   }
 
+  // Monitor price changes with interval-based checking
   useEffect(() => {
-    if (!isAlertActive || !basePrice || !currentPrice || hasTriggeredRef.current) return
-    if (lastCheckedPriceRef.current === currentPrice) return
+    if (!isAlertActive || !basePrice) return
 
-    lastCheckedPriceRef.current = currentPrice
-    const percentChange = ((currentPrice - basePrice) / basePrice) * 100
-    const threshold = parseFloat(alertPercent)
-
-    if (Math.abs(percentChange) >= threshold) {
-      hasTriggeredRef.current = true
-      const direction = percentChange > 0 ? "increased" : "decreased"
-      const message = `BTC has ${direction} by ${Math.abs(percentChange).toFixed(2)}% to $${currentPrice.toLocaleString()}`
+    const checkPrice = () => {
+      if (!currentPrice || hasTriggeredRef.current) return
       
-      sendAllNotifications("Bitcoin Price Alert", message)
-      deactivateAlert()
+      const percentChange = ((currentPrice - basePrice) / basePrice) * 100
+      const threshold = parseFloat(alertPercent)
+
+      console.log("[v0] Alert check - Current:", currentPrice, "Base:", basePrice, "Change:", percentChange.toFixed(2) + "%", "Threshold:", threshold + "%")
+
+      if (Math.abs(percentChange) >= threshold) {
+        hasTriggeredRef.current = true
+        const direction = percentChange > 0 ? "increased" : "decreased"
+        const message = `BTC has ${direction} by ${Math.abs(percentChange).toFixed(2)}% to $${currentPrice.toLocaleString()}`
+        
+        console.log("[v0] Alert triggered!", message)
+        sendAllNotifications("Bitcoin Price Alert", message)
+        deactivateAlert()
+      }
     }
+
+    // Check immediately
+    checkPrice()
+
+    // Set up interval to check every second
+    const intervalId = setInterval(checkPrice, 1000)
+
+    return () => clearInterval(intervalId)
   }, [currentPrice, isAlertActive, basePrice, alertPercent, sendAllNotifications])
 
   const updateConfig = (channel: NotificationChannel, value: boolean) => {
@@ -316,9 +341,14 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
           )}
         </div>
 
-        {isAlertActive && basePrice && (
+        {isAlertActive && basePrice && currentPrice && (
           <div className="space-y-2 pt-2 border-t border-border/50">
-            <p className="text-xs text-muted-foreground">Monitoring from base price:</p>
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">Monitoring from base price:</p>
+              <p className="text-xs font-mono text-muted-foreground">
+                Current change: {((currentPrice - basePrice) / basePrice * 100).toFixed(3)}%
+              </p>
+            </div>
             <p className="font-medium">
               ${basePrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
@@ -337,6 +367,17 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
               </div>
             </div>
           </div>
+        )}
+
+        {!isAlertActive && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => sendBrowserNotification("Test Notification", "Browser notifications are working!")}
+            className="w-full text-xs text-muted-foreground"
+          >
+            Test Browser Notification
+          </Button>
         )}
 
         {notificationConfig.browser && notificationPermission === "denied" && (

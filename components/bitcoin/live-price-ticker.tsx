@@ -45,7 +45,6 @@ function AnimatedDigit({ digit, isDecimal }: { digit: string; isDecimal?: boolea
 export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) {
   const [displayPrice, setDisplayPrice] = useState<number>(price ?? 0)
   const [microTrend, setMicroTrend] = useState<"up" | "down" | null>(null)
-  const [flashColor, setFlashColor] = useState<"green" | "red" | null>(null)
   const lastRealPrice = useRef<number>(price ?? 0)
   const microIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -82,12 +81,6 @@ export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) 
     const prevPrice = lastRealPrice.current
     lastRealPrice.current = price
 
-    if (prevPrice !== 0 && price !== prevPrice) {
-      // Flash effect on real price change
-      setFlashColor(price > prevPrice ? "green" : "red")
-      setTimeout(() => setFlashColor(null), 500)
-    }
-
     setDisplayPrice(price)
   }, [price])
 
@@ -111,15 +104,7 @@ export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) 
       </div>
 
       {/* Price display */}
-      <div
-        className={`font-mono text-5xl md:text-6xl font-bold tracking-tighter transition-all duration-200 ${
-          flashColor === "green"
-            ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]"
-            : flashColor === "red"
-            ? "text-red-400 drop-shadow-[0_0_10px_rgba(248,113,113,0.5)]"
-            : "text-foreground"
-        }`}
-      >
+      <div className="font-mono text-5xl md:text-6xl font-bold tracking-tighter text-foreground">
         <span className="text-muted-foreground/70 text-4xl md:text-5xl">$</span>
         {priceDigits.map((digit, index) => (
           <AnimatedDigit
