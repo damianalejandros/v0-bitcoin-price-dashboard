@@ -7,21 +7,17 @@ import { LivePriceTicker } from "./live-price-ticker"
 
 interface PriceCardProps {
   price: number | undefined
-  previousPrice?: number
   changePercent: number | undefined
   high: number | undefined
   low: number | undefined
-  volume?: number
   isLoading: boolean
 }
 
 export function PriceCard({ 
   price, 
-  previousPrice,
   changePercent, 
   high, 
   low, 
-  volume,
   isLoading 
 }: PriceCardProps) {
   const isPositive = (changePercent ?? 0) >= 0
@@ -75,7 +71,7 @@ export function PriceCard({
       <CardContent className="space-y-6 relative">
         {/* Live Price Ticker */}
         <div className="py-2">
-          <LivePriceTicker price={price} previousPrice={previousPrice} />
+          <LivePriceTicker price={price} />
         </div>
         
         {/* 24h Change */}
@@ -118,17 +114,7 @@ export function PriceCard({
           </div>
         </div>
 
-        {/* Volume if available */}
-        {volume && (
-          <div className="pt-2 border-t border-border/50">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground/70">
-              24h Volume
-            </span>
-            <p className="font-mono font-medium">
-              ${(volume / 1e9).toFixed(2)}B
-            </p>
-          </div>
-        )}
+
       </CardContent>
     </Card>
   )

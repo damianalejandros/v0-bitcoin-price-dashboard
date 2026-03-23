@@ -1,11 +1,11 @@
 "use client"
 
-import { useRef } from "react"
 import useSWR from "swr"
 import { PriceCard } from "./price-card"
 import { PriceChart } from "./price-chart"
 import { AlertSettings } from "./alert-settings"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { RefreshCw, Bitcoin } from "lucide-react"
 
 interface BitcoinData {
@@ -23,8 +23,6 @@ interface BitcoinData {
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export function BitcoinDashboard() {
-  const previousPriceRef = useRef<number | undefined>(undefined)
-  
   const { data, error, isLoading, mutate } = useSWR<BitcoinData>(
     "/api/bitcoin",
     fetcher,
@@ -34,11 +32,6 @@ export function BitcoinDashboard() {
       dedupingInterval: 1000,
     }
   )
-
-  // Track previous price for animations
-  if (data?.price && data.price !== previousPriceRef.current) {
-    previousPriceRef.current = data.price
-  }
 
   if (error) {
     return (
@@ -66,7 +59,7 @@ export function BitcoinDashboard() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Bitcoin Dashboard</h1>
             <p className="text-sm text-muted-foreground">
-              Live price from Yahoo Finance
+              Real-time data from Yahoo Finance
             </p>
           </div>
         </div>
@@ -89,6 +82,7 @@ export function BitcoinDashboard() {
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
+          <ThemeToggle />
         </div>
       </div>
 
@@ -97,11 +91,9 @@ export function BitcoinDashboard() {
         <div className="space-y-6">
           <PriceCard
             price={data?.price}
-            previousPrice={previousPriceRef.current}
             changePercent={data?.changePercent}
             high={data?.high}
             low={data?.low}
-            volume={data?.volume}
             isLoading={isLoading && !data}
           />
           <AlertSettings currentPrice={data?.price} />

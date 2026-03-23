@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { TrendingUp, TrendingDown, Zap } from "lucide-react"
+import { Zap } from "lucide-react"
 
 interface LivePriceTickerProps {
   price: number | undefined
-  previousPrice?: number
 }
 
 function AnimatedDigit({ digit, isDecimal }: { digit: string; isDecimal?: boolean }) {
@@ -42,9 +41,8 @@ function AnimatedDigit({ digit, isDecimal }: { digit: string; isDecimal?: boolea
   )
 }
 
-export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) {
+export function LivePriceTicker({ price }: LivePriceTickerProps) {
   const [displayPrice, setDisplayPrice] = useState<number>(price ?? 0)
-  const [microTrend, setMicroTrend] = useState<"up" | "down" | null>(null)
   const lastRealPrice = useRef<number>(price ?? 0)
   const microIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -57,10 +55,6 @@ export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) 
     const newPrice = lastRealPrice.current + randomChange
 
     setDisplayPrice(newPrice)
-    setMicroTrend(randomChange > 0 ? "up" : "down")
-
-    // Clear micro trend after a short delay
-    setTimeout(() => setMicroTrend(null), 100)
   }, [])
 
   // Start micro-fluctuation simulation
@@ -113,38 +107,6 @@ export function LivePriceTicker({ price, previousPrice }: LivePriceTickerProps) 
             isDecimal={digit === "."}
           />
         ))}
-
-        {/* Micro trend indicator */}
-        {microTrend && (
-          <span
-            className={`inline-block ml-1 text-xs transition-opacity duration-100 ${
-              microTrend === "up" ? "text-emerald-500" : "text-red-500"
-            }`}
-          >
-            {microTrend === "up" ? (
-              <TrendingUp className="h-4 w-4 inline" />
-            ) : (
-              <TrendingDown className="h-4 w-4 inline" />
-            )}
-          </span>
-        )}
-      </div>
-
-      {/* 24h trend indicator below price */}
-      {trend && (
-        <div
-          className={`flex items-center gap-1 mt-2 text-sm font-medium ${
-            trend === "up" ? "text-emerald-500" : "text-red-500"
-          }`}
-        >
-          {trend === "up" ? (
-            <TrendingUp className="h-4 w-4" />
-          ) : (
-            <TrendingDown className="h-4 w-4" />
-          )}
-          <span>vs last update</span>
-        </div>
-      )}
     </div>
   )
 }
