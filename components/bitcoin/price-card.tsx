@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { TrendingUp, TrendingDown, Bitcoin, Activity } from "lucide-react"
+import { TrendingUp, TrendingDown, Bitcoin } from "lucide-react"
 import { LivePriceTicker } from "./live-price-ticker"
 
 interface PriceCardProps {
@@ -60,10 +60,6 @@ export function PriceCard({
             </div>
             <span>Bitcoin</span>
             <span className="text-xs text-muted-foreground/60">BTC-USD</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
-            <span>Real-time</span>
           </div>
         </CardTitle>
       </CardHeader>

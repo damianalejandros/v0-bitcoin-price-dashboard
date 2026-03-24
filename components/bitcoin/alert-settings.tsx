@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Bell, BellOff, BellRing, Download, Smartphone } from "lucide-react"
+import { Bell, BellOff, BellRing, Download, Smartphone, Monitor } from "lucide-react"
 
 interface AlertSettingsProps {
   currentPrice: number | undefined
@@ -20,7 +20,24 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
   const [isInstallable, setIsInstallable] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isMobile, setIsMobile] = useState(false)
   const hasTriggeredRef = useRef(false)
+
+  // Detect if mobile device
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const checkMobile = () => {
+        const userAgent = navigator.userAgent || navigator.vendor
+        const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        const isSmallScreen = window.innerWidth < 768
+        setIsMobile(isMobileDevice || (isTouchDevice && isSmallScreen))
+      }
+      checkMobile()
+      window.addEventListener('resize', checkMobile)
+      return () => window.removeEventListener('resize', checkMobile)
+    }
+  }, [])
 
   // Register service worker
   useEffect(() => {
@@ -28,6 +45,8 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
       navigator.serviceWorker.register("/sw.js")
         .then((registration) => {
           setSwRegistration(registration)
+          // Keep service worker alive
+          registration.update()
         })
         .catch((error) => {
           console.error("SW registration failed:", error)
@@ -76,17 +95,35 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
   }
 
   const sendNotification = useCallback((title: string, body: string) => {
-    // Try service worker notification first (works better on mobile/Android)
-    if (swRegistration?.active) {
-      swRegistration.active.postMessage({
-        type: "SHOW_NOTIFICATION",
-        title,
-        body
+    // For Android/mobile, use Service Worker showNotification (more reliable)
+    if (swRegistration) {
+      swRegistration.showNotification(title, {
+        body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: "btc-alert-" + Date.now(),
+        requireInteraction: true,
+        vibrate: [300, 100, 300, 100, 300],
+        renotify: true,
+        silent: false,
+      }).catch((err) => {
+        console.error("SW notification failed:", err)
+        // Fallback to regular Notification API
+        try {
+          new Notification(title, {
+            body,
+            icon: "/icon-192.png",
+            tag: "btc-alert",
+            requireInteraction: true,
+          })
+        } catch (e) {
+          console.error("Regular notification also failed:", e)
+        }
       })
       return
     }
 
-    // Fallback to regular notification
+    // Fallback for desktop without SW
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
       try {
         new Notification(title, {
@@ -94,19 +131,9 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
           icon: "/icon-192.png",
           tag: "btc-alert-" + Date.now(),
           requireInteraction: true,
-          silent: false,
         })
       } catch (error) {
-        // On mobile, Notification constructor might fail, use SW instead
-        if (swRegistration) {
-          swRegistration.showNotification(title, {
-            body,
-            icon: "/icon-192.png",
-            tag: "btc-alert-" + Date.now(),
-            requireInteraction: true,
-            vibrate: [200, 100, 200],
-          })
-        }
+        console.error("Notification error:", error)
       }
     }
   }, [swRegistration])
@@ -142,10 +169,10 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
 
     if (Math.abs(percentChange) >= threshold) {
       hasTriggeredRef.current = true
-      const direction = percentChange > 0 ? "increased" : "decreased"
-      const message = `BTC has ${direction} by ${Math.abs(percentChange).toFixed(2)}% to $${currentPrice.toLocaleString()}`
+      const direction = percentChange > 0 ? "subido" : "bajado"
+      const message = `BTC ha ${direction} ${Math.abs(percentChange).toFixed(2)}% a $${currentPrice.toLocaleString()}`
       
-      sendNotification("Bitcoin Price Alert", message)
+      sendNotification("Alerta de Precio BTC", message)
       deactivateAlert()
     }
   }, [currentPrice, isAlertActive, basePrice, alertPercent, sendNotification, deactivateAlert])
@@ -174,14 +201,22 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Install App Banner */}
+        {/* Install App Banner - Different icon for mobile vs desktop */}
         {isInstallable && !isStandalone && (
           <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <div className="flex items-center gap-3">
-              <Smartphone className="h-5 w-5 text-amber-500 shrink-0" />
+              {isMobile ? (
+                <Smartphone className="h-5 w-5 text-amber-500 shrink-0" />
+              ) : (
+                <Monitor className="h-5 w-5 text-amber-500 shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-amber-500">Install App</p>
-                <p className="text-xs text-muted-foreground">Get reliable notifications</p>
+                <p className="text-sm font-medium text-amber-500">
+                  {isMobile ? "Install App" : "Install Desktop App"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMobile ? "Get reliable notifications" : "Get desktop notifications"}
+                </p>
               </div>
               <Button size="sm" onClick={installApp} className="shrink-0 bg-amber-500 hover:bg-amber-600 text-black">
                 <Download className="h-4 w-4 mr-1" />
@@ -194,7 +229,7 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
         {isStandalone && (
           <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20">
             <p className="text-xs text-emerald-500 text-center flex items-center justify-center gap-1">
-              <Smartphone className="h-3 w-3" />
+              {isMobile ? <Smartphone className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
               Running as installed app
             </p>
           </div>
@@ -282,15 +317,14 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => {
+            onClick={async () => {
               if (notificationPermission !== "granted") {
-                requestNotificationPermission().then((granted) => {
-                  if (granted) {
-                    sendNotification("Test Notification", "Notifications are working correctly!")
-                  }
-                })
+                const granted = await requestNotificationPermission()
+                if (granted) {
+                  setTimeout(() => sendNotification("Test", "Notifications working!"), 500)
+                }
               } else {
-                sendNotification("Test Notification", "Notifications are working correctly!")
+                sendNotification("Test", "Notifications working!")
               }
             }}
             className="w-full text-xs text-muted-foreground"

@@ -6,7 +6,7 @@ import { PriceChart } from "./price-chart"
 import { AlertSettings } from "./alert-settings"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { RefreshCw, Bitcoin } from "lucide-react"
+import { Bitcoin } from "lucide-react"
 
 interface BitcoinData {
   price: number
@@ -63,27 +63,7 @@ export function BitcoinDashboard() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {data?.lastUpdated && (
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                Last sync
-              </p>
-              <p className="text-xs font-mono text-muted-foreground">
-                {new Date(data.lastUpdated).toLocaleTimeString()}
-              </p>
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => mutate()}
-            className="h-9 w-9"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-          <ThemeToggle />
-        </div>
+        <ThemeToggle />
       </div>
 
       {/* Main Grid */}

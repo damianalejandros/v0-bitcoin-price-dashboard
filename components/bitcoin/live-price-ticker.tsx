@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import { Zap } from "lucide-react"
 
 interface LivePriceTickerProps {
   price: number | undefined
@@ -83,14 +82,6 @@ export function LivePriceTicker({ price }: LivePriceTickerProps) {
 
   return (
     <div className="relative">
-      {/* Live indicator */}
-      <div className="absolute -top-1 -right-1 flex items-center gap-1">
-        <Zap className="h-3 w-3 text-amber-500 animate-pulse" />
-        <span className="text-[10px] uppercase tracking-wider text-amber-500 font-semibold">
-          Live
-        </span>
-      </div>
-
       {/* Price display */}
       <div className="font-mono text-5xl md:text-6xl font-bold tracking-tighter text-foreground">
         <span className="text-muted-foreground/70 text-4xl md:text-5xl">$</span>
