@@ -283,22 +283,13 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
         {/* Test Notification Button */}
         {!isAlertActive && (
           <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={async () => {
-              if (notificationPermission !== "granted") {
-                const granted = await requestNotificationPermission()
-                if (granted) {
-                  setTimeout(() => sendNotification("Test", "Notifications working!"), 500)
-                }
-              } else {
-                sendNotification("Test", "Notifications working!")
-              }
-            }}
-            className="w-full text-xs text-muted-foreground"
-          >
-            Test Notification
-          </Button>
+  variant="ghost" 
+  size="sm" 
+  onClick={() => sendNotification("Test", "Notifications working!")}
+  className="w-full text-xs text-muted-foreground"
+>
+  Test Notification
+</Button>
         )}
 
         {notificationPermission === "denied" && (
