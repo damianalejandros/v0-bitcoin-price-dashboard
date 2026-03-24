@@ -94,49 +94,17 @@ export function AlertSettings({ currentPrice }: AlertSettingsProps) {
     return permission === "granted"
   }
 
-  const sendNotification = useCallback((title: string, body: string) => {
-    // For Android/mobile, use Service Worker showNotification (more reliable)
-    if (swRegistration) {
-      swRegistration.showNotification(title, {
-        body,
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        tag: "btc-alert-" + Date.now(),
-        requireInteraction: true,
-        vibrate: [300, 100, 300, 100, 300],
-        renotify: true,
-        silent: false,
-      }).catch((err) => {
-        console.error("SW notification failed:", err)
-        // Fallback to regular Notification API
-        try {
-          new Notification(title, {
-            body,
-            icon: "/icon-192.png",
-            tag: "btc-alert",
-            requireInteraction: true,
-          })
-        } catch (e) {
-          console.error("Regular notification also failed:", e)
-        }
+  const sendNotification = useCallback(async (title: string, body: string) => {
+    try {
+      await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body }),
       })
-      return
+    } catch (err) {
+      console.error("Error enviando notificación:", err)
     }
-
-    // Fallback for desktop without SW
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      try {
-        new Notification(title, {
-          body,
-          icon: "/icon-192.png",
-          tag: "btc-alert-" + Date.now(),
-          requireInteraction: true,
-        })
-      } catch (error) {
-        console.error("Notification error:", error)
-      }
-    }
-  }, [swRegistration])
+  }, [])
 
   const activateAlert = async () => {
     if (!currentPrice) return
